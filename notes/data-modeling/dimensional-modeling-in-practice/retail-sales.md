@@ -6,7 +6,7 @@ Hãy tưởng tượng bạn làm việc tại headquaters của một chuỗi c
 
 Dữ liệu được thu thập chủ yếu tại hai điểm: quầy thu ngân, nơi hệ thống POS quét mã vạch từng sản phẩm để ghi nhận giao dịch bán hàng; và cửa sau, nơi nhà cung cấp giao hàng vào kho.
 
-<figure><img src="../../.gitbook/assets/image.png" alt="" width="267"><figcaption><p>Mẫu biên lai thu ngân</p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/3_retail_sale_invoice_example.png" alt="" width="267"><figcaption><p>Mẫu biên lai thu ngân</p></figcaption></figure>
 
 Mục tiêu kinh doanh xoay quanh việc dự báo nhu cầu, tối ưu tồn kho, bán được nhiều hàng nhất và tối đa hóa lợi nhuận. Pricing và promotion là hai yếu tố tác động mạnh đến doanh số: giảm giá tạm thời, quảng cáo, trưng bày hàng, hoặc coupon đều có thể đẩy volume bán tăng mạnh, nhưng cũng dễ khiến biên lợi nhuận giảm. Vì vậy, khả năng phân tích tác động của giá và các hình thức khuyến mãi là trọng tâm với cả cửa hàng lẫn trụ sở.
 
@@ -77,11 +77,49 @@ Trong các dimension tương ứng lúc này, `transaction_number` là dimension
 
 ### 4. Xác định Facts
 
+Bước thứ 4 và là bước cuối cùng trong quy trình 4 bước là xác định cẩn thận những facts nào sẽ xuất hiện trong bảng fact. Một lần nữa, cần bám sát grain và facts cũng cần phải phù hợp vơi grain - item line trong trường hợp này.
 
+Facts thu thập được từ hệ thống POS là **số lượng bán**, **giá niêm yết trên mỗi đơn vị**, **mức giảm giá trên mỗi đơn vị**, **giá thực trả sau giảm**, cùng với **tổng tiền bán** và **tổng tiền giảm giá** cho dòng sản phẩm đó. Tổng tiền bán được tính bằng _số lượng nhân với giá sau giảm_, và tổng tiền giảm giá được tính bằng _số lượng nhân với mức giảm trên mỗi đơn vị_.
 
+```mermaid
+erDiagram
+    RETAIL_SALES_FACT {
+        int Date_Key FK
+        int Product_Key FK
+        int Store_Key FK
+        int Promotion_Key FK
+        int Cashier_Key FK
+        int Payment_Method_Key FK
+        string POS_Transaction_Number
+        decimal Sales_Quantity
+        decimal Regular_Unit_Price
+        decimal Discount_Unit_Price
+        decimal Net_Unit_Price
+        decimal Extended_Discount_Amount
+        decimal Extended_Sales_Amount
+        decimal Extended_Cost_Amount
+        decimal Extended_Gross_Profit_Amount
+    }
 
+    DATE_DIMENSION {}
 
+    PRODUCT_DIMENSION {}
 
+    STORE_DIMENSION {}
+
+    PROMOTION_DIMENSION {}
+
+    CASHIER_DIMENSION {}
+
+    PAYMENT_METHOD_DIMENSION {}
+
+    DATE_DIMENSION ||--o{ RETAIL_SALES_FACT : "date"
+    PRODUCT_DIMENSION ||--o{ RETAIL_SALES_FACT : "product"
+    STORE_DIMENSION ||--o{ RETAIL_SALES_FACT : "store"
+    PROMOTION_DIMENSION ||--o{ RETAIL_SALES_FACT : "promotion"
+    CASHIER_DIMENSION ||--o{ RETAIL_SALES_FACT : "cashier"
+    PAYMENT_METHOD_DIMENSION ||--o{ RETAIL_SALES_FACT : "payment_method"
+```
 
 
 

@@ -200,7 +200,7 @@ Chưa có câu trả lời ở đây :joy:. Tớ thấy mấy chương sau có g
 
 Enterprise data warehouse bus matrix là công cụ quan trọng để thiết kế và truyền đạt kiến trúc enterprise data warehouse bus architecture. Nó là một ma trận cho thấy toàn doanh nghiệp có những business process nào và dùng những dimension nào.
 
-<figure><img src="../../.gitbook/assets/image (1).png" alt="" width="563"><figcaption><p>Ví dụ của một bus matrix</p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/bus_matrix_example.png" alt="" width="563"><figcaption><p>Ví dụ của một bus matrix</p></figcaption></figure>
 
 Ta có thể sử dụng bus matrix phục vụ nhu cầu design theo hai hướng:
 

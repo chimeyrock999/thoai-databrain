@@ -12,7 +12,7 @@ Apache Spark là unified computing engine và tập hợp các thư viện cho v
 
 Spark là một framework điều phối hoạt động của một nhóm machines (quản lý và điều phối quá trình thực thi các tasks trong toàn bộ cluster). Lưu lý rằng Spark chỉ quản lý task trên cluster, không quản lý cluster, nhiệm vụ này được tổ chức bởi Cluster Manager (Spark standalone cluster manager, Hadoop YARN, Mesos hoặc Kubernetes).<br>
 
-<figure><img src="../.gitbook/assets/SparkArchitecture.png" alt=""><figcaption><p>Apache Spark Overview Architecture</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/spark_architecture.png" alt=""><figcaption><p>Apache Spark Overview Architecture</p></figcaption></figure>
 
 ### **Spark Application**
 
