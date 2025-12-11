@@ -185,12 +185,44 @@ Khi cần mức độ chi tiết hơn (giờ–phút–giây), fact table có th
 
 ## Role-Playing Dimensions
 
-Một bảng dimension vật lý (physical table) — ví dụ `dim_date` — có thể được fact table tham chiếu nhiều lần, mỗi lần với một ý nghĩa khác nhau. Tất cả tham chiếu này đều tớinsion chung một bảng dimension, nhưng mỗi “vai trò” phải được tách thành một view riêng (hoặc alias) với các tên cột khác nhau để không bị lẫn. Những role này chính là role-playing dimensions.
+Một bảng dimension vật lý (physical table) - ví dụ `dim_date` - có thể được fact table tham chiếu nhiều lần, mỗi lần với một ý nghĩa khác nhau. Tất cả tham chiếu này đều tới chung một bảng dimension, nhưng mỗi “vai trò” phải được tách thành một view riêng (hoặc alias) với các tên cột khác nhau để không bị lẫn. Những role này chính là role-playing dimensions.
+
+Mặc dù tất cả các cột đều đến từ cùng một bảng `dim_date`, nhưng để tránh nhầm lẫn khi join hoặc hiển thị báo cáo, Kimball khuyến nghị:
+
+* Tạo một view riêng (hoặc alias) cho mỗi role.
+* View này sẽ được đặt tên mới cho tất cả các cột.
+* Về mặt SQL, hệ thống BI sẽ nhìn chúng như những dimension độc lập, dù thực tế chúng chỉ là những view dựa trên một bảng vật lý duy nhất.
+
+Điều này cho phép fact table join vào cùng một bảng date dimension nhiều lần một cách rõ ràng, minh bạch, không gây mơ hồ về semantics.
 
 {% hint style="info" %}
 ## Ví dụ:
 
-Trong `fact_order` có nhiều loại ngày nhưng với role khác nhau như "Order Date", "Ship Date", "Delivery Date", "Return Date". Khi đó trên bảng facts sẽ có các cột riêng `order_date`, `ship_date`, `delivery_date`, `return_date` vơi các tên khác nhau nhưng cùng tham chiếu tới cùng một bảng date dimension.
+Trong `fact_order` có nhiều loại ngày nhưng với role khác nhau như "Order Date", "Ship Date", "Delivery Date", "Return Date". Khi đó trên bảng facts sẽ có các cột riêng `order_date`, `ship_date`, `delivery_date`, `return_date` vơi các tên khác nhau nhưng cùng tham chiếu tới các view khác nhau, được tạo dựa trên cùng một bảng date dimension.
+
+```sql
+-- ORDER_DATE_DIM
+create view order_date_dim as
+select
+    date_key as order_date_key,
+    calendar_date as order_calendar_date,
+    month as order_month,
+    year as order_year,
+    ...
+from dim_date;
+
+-- SHIP_DATE_DIM
+create view ship_date_dim as
+select
+    date_key as ship_date_key,
+    calendar_date as ship_calendar_date,
+    month as ship_month,
+    year as ship_year,
+    ...
+from dim_date;
+```
+
+BI sẽ join tới view một cách trực tiếp và rõ ràng về ngữ nghĩa chứ không join thẳng vào date dimension. Về storage, các view này đảm bảo không dư thừa dữ liệu hoặc mismatch về column logic.
 {% endhint %}
 
 ## Junk Dimensions

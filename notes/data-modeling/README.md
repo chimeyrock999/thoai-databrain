@@ -462,7 +462,7 @@ Relational Model chính là nền tảng lý thuyết của toàn bộ hệ cơ 
 | **Integrity Constraints** | Các quy tắc đảm bảo độ chính xác và nhất quán của dữ liệu.               |
 | **View**                  | Bảng ảo tạo ra từ query; không lưu dữ liệu vật lý.                       |
 
-#### [**Dimensional Modeling**](dimensional-modeling-techniques/)
+#### [**Dimensional Modeling**](dimensional-modeling/)
 
 Dimensional Modeling là một cách tiếp cận cụ thể của data modeling, chủ yếu phù hợp cho data warehousing, business intelligence (BI) và một số data models ngày nay.
 
