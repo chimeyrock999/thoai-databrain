@@ -12,5 +12,5 @@
     * [Dimensional Modeling in Practice](data-modeling/dimensional-modeling/dimensional-modeling-in-practice/README.md)
       * [Retail Sales](data-modeling/dimensional-modeling/dimensional-modeling-in-practice/retail-sales.md)
 * [Apache Spark](apache-spark/README.md)
+  * [Spark Application Concepts](apache-spark/spark-application-concepts.md)
   * [RDD vs DataFrame vs Dataset](apache-spark/rdd-vs-dataframe-vs-dataset.md)
-  * [Spark Execution Model](apache-spark/spark-execution-model.md)

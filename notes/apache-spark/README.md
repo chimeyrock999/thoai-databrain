@@ -10,29 +10,29 @@ Apache Spark là unified computing engine và tập hợp các thư viện cho v
 
 ## Overview Architecture
 
-Spark là một framework điều phối hoạt động của một nhóm machines (quản lý và điều phối quá trình thực thi các tasks trong toàn bộ cluster). Lưu lý rằng Spark chỉ quản lý task trên cluster, không quản lý cluster, nhiệm vụ này được tổ chức bởi Cluster Manager (Spark standalone cluster manager, Hadoop YARN, Mesos hoặc Kubernetes).<br>
+Spark là một framework điều phối hoạt động của một nhóm machines (quản lý và điều phối quá trình thực thi các tasks trong toàn bộ cluster). Lưu lý rằng Spark chỉ quản lý task trên cluster, không quản lý cluster, nhiệm vụ này được tổ chức bởi Cluster Manager.<br>
 
-<figure><img src="../.gitbook/assets/spark_architecture.png" alt=""><figcaption><p>Apache Spark Overview Architecture</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/spark_architecture.png" alt=""><figcaption><p>Apache Spark components and architecture</p></figcaption></figure>
 
 ### **Spark Application**
 
-Code của người dùng sử dụng Spark API (Python, Java, Scala, hoặc Spark SQL) được đóng gói thành `SparkApplication`. Chúng ta submit application này tới `ClusterManager` thông qua câu lệnh `spark-submit`. `SparkApplication` bao gồm một `SparkDriver` chịu trách nhiệm điều phối các hoạt động song song trên Spark cluster. Driver này truy cập các thành phần phân tán (`SparkExecutor` và `ClusterManager`) thông qua `SparkSession`.
+Code của người dùng sử dụng Spark API (Python, Java, Scala, hoặc Spark SQL) được đóng gói thành Spark Application. Chúng ta submit application này tới Cluster Manager thông qua câu lệnh `spark-submit`. Spark Application bao gồm một Spark Driver chịu trách nhiệm điều phối các hoạt động song song trên Spark cluster. Driver này truy cập các thành phần phân tán (Spark Executor và Cluster Manager) thông qua SparkSession.
 
 ### **Cluster Manager**
 
-`ClusterManager` chịu trách nhiệm phân phối tài nguyên để thực thi các `SparkApplication`.
+Cluster Manager hay Spark Master chịu trách nhiệm phân phối tài nguyên để thực thi các Spark Application. Master có thể là built-in standalone cluster manager, Hadoop YARN, Apache Mesos hoặc Kubernetes.
 
 ### **Spark Driver**
 
-`SparkDriver` chịu trách nhiệm khởi tạo `SparkSession`; giao tiếp với `ClusterManager` để yêu cầu tài nguyên (CPU, memory) cho `SparkExecutor` ; chuyển đổi các Spark operations thành DAG computations, lập lịch và phân phối thành các tasks cho các Spark Executors.
+Spark Driver chịu trách nhiệm khởi tạo SparkSession; giao tiếp với Cluster Manager để yêu cầu tài nguyên (CPU, memory) cho Spark Executor ; chuyển đổi các Spark operations thành DAG computations, lập lịch và phân phối thành các tasks cho các Spark Executors.
 
 ### **Spark Session**
 
-`SparkSession` là entry point cho các Spark Application kể từ Spark 2.0. Nó gần như là bản nâng cấp của `SparkContext`, bằng việc kết hợp `SparkContext`, `SQLContext`, `HiveContext`, và `StreamingContext`, trong khi với Spark 1.x, ta phải tạo từng Conext một.
+Spark Session là entry point cho các Spark Application kể từ Spark 2.0. Nó gần như là bản nâng cấp của Spark Context, bằng việc kết hợp Spark Context, SQL Context, Hive Context, và Streamin gContext, trong khi với Spark 1.x, ta phải tạo từng Context một.
 
 ### **Spark Executor**
 
-`SparkExecutor` là JVMs process chạy trên các `WorkerNode` (đối với Spark in K8S thì executor chạy trong các `Pod`), chịu trách nhiệm thực thi các tasks. Trong hầu hết deployments modes, thì chỉ có 1 executor trên 1 node.
+Spark Executor là JVMs process chạy trên các Worker Node (đối với Spark in K8S thì executor chạy trong các Pod), chịu trách nhiệm thực thi các tasks. Trong hầu hết deployments modes, thì chỉ có 1 executor trên 1 node.
 
 ### Deployment Mode
 
@@ -44,6 +44,8 @@ Code của người dùng sử dụng Spark API (Python, Java, Scala, hoặc Spa
 | YARN (cluster) | Chạy cùng với YARN Applcation Master             | YARN’s NodeManager’s container                          | YARN’s Resource Manager kết hợp với YARN’s Application Master để chỉ định containers trên NodeManagers cho executors |
 | Kubernetes     | Chạy trên một K8S Pod                            | Mỗi workers chạy trong 1 K8S Pod                        | Kubernetes Master                                                                                                    |
 
-### **Distributed data and partitions**
+### **Distributed Data and Partitions**
 
-Trong thực tế, dữ liêu phân bố trong các storage dưới dạng các partitions. Tuy nhiên, Spark sẽ đối xử với từng partition này như một **in-memory** **high-level logical data abstraction - DataFrame**. Mặc dù không phải lúc nào cũng có thể, các executor sẽ được ưu tiên phân bố các task yêu cầu đọc partition gần với nó nhất và chỉ xử lý dữ liệu trên các data partition được assign này.
+Trong thực tế, physical data được lưu trữ và phân bố thành nhiều partition trên HDFS hoặc các Cloud Storage. Tuy nhiên, khi xử lý, Spark không làm việc trực tiếp với các partition vật lý này. Thay vào đó, Spark trừu tượng hoá mỗi partition thành một đơn vị logic trong bộ nhớ - tức một DataFrame.
+
+Khi lập lịch thực thi, Spark **ưu tiên** giao nhiệm vụ cho executor đọc những partition “gần” nó nhất trong topology mạng (data locality). Điều này giúp giảm chi phí truyền dữ liệu qua mạng, dù không phải lúc nào Spark cũng đảm bảo được sự gần nhất này.
