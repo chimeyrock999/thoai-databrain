@@ -1,4 +1,22 @@
+---
+hidden: true
+---
+
 # Apache Spark
+
+## Trước khi bắt đầu
+
+Khi bắt đầu viết những dòng ghi chú này, tớ đã làm việc với Spark khoảng hai năm - “làm việc” chứ không hẳn là hai năm kinh nghiệm. Tớ từng đọc sơ qua kiến trúc Spark, từng viết Spark Application để xử lý các tác vụ cơ bản, và cũng từng tự xây dựng một framework cho Data Engineer định nghĩa logic của luồng stateless streaming từ Kafka sang TiDB/HDFS bằng DSL, kèm theo automation deploy & monitoring những pipelines này.
+
+Tớ cũng đã vận hành Spark Standalone trên bare-metal, triển khai Spark trên K8S master, và cả chạy Spark bằng Spark Operator (thậm chí tớ còn viết Airflow plugin để đóng gói logic tạo Custom Resources qua UI, dynamic configure environment với PyPi/Maven/Packaged Env/Jars,... ). Ngoài ra, việc đóng gói virtual environment, dependencies gửi kèm vào Spark jobs, chỉ định Python cũng không còn xa lạ với tớ.
+
+Nhưng dù đã chạm vào khá nhiều thứ, tớ vẫn thấy “**mình chưa thực sự hiểu Spark**”. Những buổi phỏng vấn hỏi kiểu “Lazy Evaluation là gì?” hay “Shuffle hoạt động như thế nào?” khiến tớ nhận ra mình thiếu những mảnh ghép quan trọng. Khi gặp sự cố do job tối ưu chưa tốt, tớ biết rằng cần đọc Spark UI và Execution Plan để phân tích vấn đề, nhưng lại không thật sự hiểu phải đọc _như thế nào_.
+
+Sau nhiều lần nhờ AI lập roadmap, thử đi thử lại hàng chục lần rồi lại bỏ giữa chừng, tớ quyết định quay lại học từ đầu với cái notes này. Tớ coi đây như một cách để buộc bản thân kiên trì hơn với hành trình dài hơi này. Nhưng mới đọc vài phần thôi là tớ đã thấy “ngợp” - và cũng nhờ vậy mà nhận ra nền tảng của mình chưa đủ vững. Tớ chưa nắm chắc các khái niệm về distributed processing và distributed systems. Thế nên, trước khi đi xa hơn với Spark, tớ muốn quay lại củng cố nền tảng trước đã - xây cho chắc cái móng rồi mới dựng được phần còn lại.
+
+{% content-ref url="../distributed-system-fundamental/" %}
+[distributed-system-fundamental](../distributed-system-fundamental/)
+{% endcontent-ref %}
 
 ## What is Apache Spark?
 
@@ -10,7 +28,7 @@ Apache Spark là unified computing engine và tập hợp các thư viện cho v
 
 ## Overview Architecture
 
-Spark là một framework điều phối hoạt động của một nhóm machines (quản lý và điều phối quá trình thực thi các tasks trong toàn bộ cluster). Lưu lý rằng Spark chỉ quản lý task trên cluster, không quản lý cluster, nhiệm vụ này được tổ chức bởi Cluster Manager.<br>
+Spark là một framework điều phối hoạt động của một nhóm machines (quản lý và điều phối quá trình thực thi các tasks trong toàn bộ cluster). Lưu lý rằng Spark chỉ quản lý task trên cluster, không quản lý cluster, nhiệm vụ này được tổ chức bởi Cluster Manager.
 
 <figure><img src="../.gitbook/assets/spark_architecture.png" alt=""><figcaption><p>Apache Spark components and architecture</p></figcaption></figure>
 
