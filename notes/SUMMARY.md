@@ -15,6 +15,7 @@
   * [Spark Application Concepts](apache-spark/spark-application-concepts.md)
   * [RDD vs DataFrame vs Dataset](apache-spark/rdd-vs-dataframe-vs-dataset.md)
 * [Distributed System Fundamental](distributed-system-fundamental/README.md)
-  * [Foundations of Data Systems](distributed-system-fundamental/foundations-of-data-systems.md)
+  * [Foundations of Distributed Systems](distributed-system-fundamental/foundations-of-distributed-systems.md)
+  * [MapReduce](distributed-system-fundamental/mapreduce.md)
 * [Database](database/README.md)
   * [#01 - Relational Model & Algebra (CMU Intro to Database Systems)](database/01-relational-model-and-algebra-cmu-intro-to-database-systems.md)
