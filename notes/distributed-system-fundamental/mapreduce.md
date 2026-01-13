@@ -1,6 +1,5 @@
 ---
 description: 'MapReduce: Simplified Data Processing on Large Clusters'
-hidden: true
 ---
 
 # MapReduce
