@@ -1,7 +1,3 @@
----
-hidden: true
----
-
 # Distributed System Fundamental
 
 {% content-ref url="foundations-of-distributed-systems.md" %}
