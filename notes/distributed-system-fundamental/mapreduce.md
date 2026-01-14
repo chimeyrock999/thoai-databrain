@@ -239,49 +239,15 @@ flowchart TB
 
 <details>
 
-<summary>Bước 1 có nhấn mạnh rằng "MapReduce library chạy trong chương trình của user", cụ thể là nó chạy ở đâu?</summary>
+<summary>Tớ có khá khá câu hỏi ở chỗ này.</summary>
 
-
-
-</details>
-
-<details>
-
-<summary>Quá trình tạo ra bản copy diễn ra như thế nào? Tất cả worker sẽ được nhận cả map và reduce functions? Phân phối chúng kiểu gì?</summary>
-
-
-
-</details>
-
-<details>
-
-<summary>Việc chia file ở bước 1 như thế nào? Làm sao để tránh việc split ngay giữa 1 row trong file để tránh mất thông tin? So sánh với cách Spark read files? Phải chăng là tùy loại file mà có một cách xử lý khác nhau (như Spark chia rõ file type khi đọc)?</summary>
-
-
-
-</details>
-
-<details>
-
-<summary>Nghĩa là ngay tử đầu, việc chia task đã được rõ ràng có bao nhiêu map tasks, có bao nhiêu reduce task? Và cũng assign rõ ràng worker nào sử dụng cho map task, worker nào sử dụng cho reduce task? Và như thế có hợp lý không? Nếu cụm lớn thì không sao, cụm nhỏ thì không tận dụng hết toàn bộ tài nguyên? Hơn nữa sẽ không tận dụng được locality, ví dụ 1 worker chạy map task đang chứa file trung gian được assign reduce task thì sẽ không phải gửi file qua network?</summary>
-
-
-
-</details>
-
-<details>
-
-<summary>Việc load file có thể incremental, nghĩa là ngay khi có file sẽ được chuyển qua worker chạy reduce. Vậy tại sao reduce task không được thực hiện luôn mà phải đợi full toàn bộ? Trong khi reduce task cũng chạy theo kiểu stream file, nghĩa là load từng phần vào memory, tính toán rồi lưu lại state?</summary>
-
-
-
-</details>
-
-<details>
-
-<summary>Việc kéo file từ map worker về reduce worker thực hiện như thế nào? Sử dụng RPC?</summary>
-
-
+1. **Vị trí thực thi của MapReduce library:**  Paper nói “MapReduce library chạy trong chương trình của user”. Cụ thể, library này chạy trong process nào ở đâu trong cluster hay ngoài cluster?
+2. **Phân phối user code (map / reduce):** Map và Reduce functions của user được phân phối tới worker như thế nào? Mỗi worker có nhận cả hai hàm map và reduce hay chỉ nhận khi được assign task tương ứng? Chương trình user được replicate và khởi chạy trên tất cả worker, hay chỉ đóng vai trò client submit job?
+3. **Chia input thành splits:** Việc chia input files thành splits được thực hiện theo cơ chế nào? Làm sao tránh việc split cắt ngang một record (ví dụ cắt giữa một dòng)? Cách chia splits có phụ thuộc vào định dạng file (text, binary, structured) hay không? So với Spark, MapReduce có cơ chế tương đương `InputFormat` / `RecordReader` không?
+4. **Quyết định số lượng task:** Số lượng map task và reduce task được xác định ngay từ đầu hay có thể điều chỉnh trong quá trình chạy? Worker có được cố định vai trò (map-only / reduce-only) hay có thể chạy cả map và reduce task ở các thời điểm khác nhau?
+5. **Khai thác locality giữa map và reduce:** Framework có cố gắng schedule reduce task trên worker đang giữ dữ liệu trung gian tương ứng để giảm network transfer không?
+6. **Thời điểm bắt đầu reduce:** Reduce task có thể bắt đầu xử lý khi dữ liệu trung gian được fetch dần (incremental) hay phải đợi toàn bộ map task hoàn tất? Nếu reduce xử lý dữ liệu theo kiểu streaming (iterator), tại sao framework vẫn cần đợi đủ toàn bộ dữ liệu trung gian trước khi chạy reduce logic?
+7. **Cơ chế shuffle dữ liệu:** Reduce worker kéo dữ liệu trung gian từ map worker bằng cơ chế gì? Có sử dụng RPC trực tiếp hay thông qua một giao thức/transport riêng?
 
 </details>
 
@@ -315,7 +281,7 @@ Nhờ cơ chế chạy lại task đơn giản này, MapReduce có khả năng c
 
 <summary>Tại sao cần thực thi lại toàn bộ reduce tasks đang chạy khi chỉ có 1 map task bị failed? Như thế có hiệu quả hay không?</summary>
 
-
+Nothing herer... đang đi tìm câu trả lời.
 
 </details>
 
@@ -343,9 +309,9 @@ Network bandwidth là tài nguyên khan hiếm trong môi trường cluster củ
 
 ### Task Granularity
 
-MapReduce chia pha Map thành M task và pha Reduce thành R task, với mục tiêu để M và R lớn hơn nhiều so với số worker. Việc mỗi worker thực thi nhiều task nhỏ giúp cải thiện load balancing động và tăng tốc recovery khi có worker bị lỗi, vì các task đã hoàn thành có thể dễ dàng phân phối lại cho các worker khác.
+MapReduce chia pha Map thành `M` task và pha Reduce thành `R` task, với mục tiêu để `M` và `R` lớn hơn nhiều so với số worker. Việc mỗi worker thực thi nhiều task nhỏ giúp cải thiện load balancing động và tăng tốc recovery khi có worker bị lỗi, vì các task đã hoàn thành có thể dễ dàng phân phối lại cho các worker khác.
 
-Tuy nhiên, kích thước của M và R bị giới hạn thực tế bởi chi phí quản lý của master, vốn phải duy trì trạng thái O(M + R) cho scheduling và O(M × R) metadata cho dữ liệu trung gian. Trong thực tế, M thường được chọn sao cho mỗi map task xử lý khoảng 16–64 MB dữ liệu để tối ưu locality, còn R thường là một bội số nhỏ của số worker nhằm cân bằng giữa song song và số lượng file output. Các job lớn trong thực tế có thể sử dụng hàng trăm nghìn map task và hàng nghìn reduce task.
+Tuy nhiên, kích thước của `M` và `R` bị giới hạn thực tế bởi chi phí quản lý của master, vốn phải duy trì trạng thái `O(M + R)` cho scheduling và `O(M × R)` metadata cho dữ liệu trung gian. Trong thực tế, `M` thường được chọn sao cho mỗi map task xử lý khoảng 16–64 MB dữ liệu để tối ưu locality, còn `R` thường là một bội số nhỏ của số worker nhằm cân bằng giữa song song và số lượng file output. Các job lớn trong thực tế có thể sử dụng hàng trăm nghìn map task và hàng nghìn reduce task.
 
 ### Backup Tasks
 
@@ -400,11 +366,265 @@ Các kỹ thuật như locality-aware scheduling và redundant execution có li�
 
 Paper kết luận rằng việc hạn chế mô hình lập trình là chìa khóa để đơn giản hóa parallelization, fault tolerance và load balancing. MapReduce thể hiện rõ triết lý: chấp nhận các constraint ở phía người dùng để hệ thống có thể xử lý failure bằng cách retry thay vì coordination phức tạp. Đây là một abstraction mang tính thực dụng, được thiết kế để giải quyết các bài toán dữ liệu lớn trong môi trường nhiều lỗi và tài nguyên không đồng nhất.
 
-## My Summary
+## Hadoop MapReduce
+
+### Motivation
+
+Khi đọc MapReduce paper, tớ nhận thấy vẫn còn khá nhiều điểm chưa được làm rõ và còn nhiều câu hỏi mà paper chưa trực tiếp trả lời. Do đó, thay vì dừng lại ở mức abstraction, tớ muốn tìm hiểu sâu hơn về cách hệ thống thực sự vận hành ở mức implementation. Vì lý do này, tớ chọn tiếp cận MapReduce thông qua Hadoop - một implementation phổ biến của MapReduce - nhằm có được cái nhìn cụ thể hơn về cách các ý tưởng trong paper được chuyển hóa thành một hệ thống chạy thực tế.&#x20;
+
+Trước tiên, việc nắm được bức tranh tổng quan về Hadoop sẽ giúp việc đi sâu vào các chi tiết triển khai sau đó trở nên rõ ràng và có hệ thống hơn.
+
+### Hadoop Overview
+
+Apache Hadoop là một framework mã nguồn mở dùng để **lưu trữ và xử lý dữ liệu lớn trên một cụm máy phân tán**. Có thể hiểu đơn giản, Hadoop là một **implementation của các ý tưởng cốt lõi trong MapReduce và Google File System (GFS)**, được cộng đồng phát triển và mở rộng dựa trên những thiết kế mà Google đã công bố trong các paper gốc.
+
+Thay vì chỉ hiện thực riêng lẻ một mô hình xử lý hay một hệ thống lưu trữ, Hadoop cung cấp một hệ sinh thái hoàn chỉnh, bao gồm các thành phần cho lưu trữ phân tán, xử lý dữ liệu song song, quản lý tài nguyên và các thư viện dùng chung. Những thành phần này phối hợp với nhau để cho phép các job dữ liệu lớn được thực thi hiệu quả và chịu lỗi trên hạ tầng commodity hardware.
+
+#### Các thành phần chính
+
+```mermaid
+---
+config:
+  layout: dagre
+---
+flowchart LR
+ subgraph subGraph1["Hadoop Components"]
+        HDFS["HDFS"]
+        MR["MapReduce"]
+        YARN["YARN"]
+        Common["Hadoop Common"]
+  end
+ subgraph subGraph2["Hadoop Architecture"]
+        NN["NameNode"]
+        DN["DataNode"]
+        RM["ResourceManager"]
+        NM["NodeManager"]
+        AM["ApplicationMaster"]
+  end
+    HDFS_DESC["Haddop Distributed File System<br>(Equivalent with Google File System (GFS))"] L_HDFS_DESC_HDFS_0@-.- HDFS
+    MR_DESC["Distributed Processing<br>(Implementation of Google MapReduce paper)"] L_MR_DESC_MR_0@-.- MR
+    COMMON_DESC["Java Library &amp; utilities<br>(Java code)"] L_COMMON_DESC_Common_0@-.- Common
+    YARN_DESC["Yet Another Resource Negotiator<br>(Job Scheduling &amp; Resource Manager)"] L_YARN_DESC_YARN_0@-.- YARN
+    HDFS L_HDFS_NN_0@--> NN & DN
+    YARN L_YARN_RM_0@--> RM & NM & AM
+    MR L_MR_YARN_0@--> YARN
+    Common L_Common_HDFS_0@--> HDFS & YARN & MR
+
+    HDFS_DESC@{ shape: text}
+    MR_DESC@{ shape: text}
+    COMMON_DESC@{ shape: text}
+    YARN_DESC@{ shape: text}
+    style subGraph2 fill:#FFF9C4
+    style subGraph1 fill:#C8E6C9
+    linkStyle 0 stroke:#757575,fill:none
+    linkStyle 1 stroke:#757575,fill:none
+    linkStyle 2 stroke:#757575,fill:none
+
+    L_HDFS_DESC_HDFS_0@{ curve: linear } 
+    L_MR_DESC_MR_0@{ curve: linear } 
+    L_COMMON_DESC_Common_0@{ curve: linear } 
+    L_YARN_DESC_YARN_0@{ curve: linear } 
+    L_HDFS_NN_0@{ curve: linear } 
+    L_HDFS_DN_0@{ curve: linear } 
+    L_YARN_RM_0@{ curve: linear } 
+    L_YARN_AM_0@{ curve: linear } 
+    L_MR_YARN_0@{ curve: linear } 
+    L_Common_HDFS_0@{ curve: linear } 
+    L_Common_YARN_0@{ curve: linear } 
+    L_Common_MR_0@{ curve: linear }
+```
+
+1. **HDFS** là hệ thống file phân tán của Hadoop, gồm **NameNode** quản lý metadata và **DataNode** lưu trữ dữ liệu thực tế trên các node trong cluster.
+2. **YARN** chịu trách nhiệm quản lý tài nguyên và lập lịch thực thi, bao gồm **ResourceManager**, **NodeManager** và **ApplicationMaster**.
+3. **MapReduce** là mô hình lập trình xử lý dữ liệu song song, được triển khai như một framework chạy trên **YARN** thông qua các container.
+4. **Hadoop Common** cung cấp các thư viện và tiện ích dùng chung cho toàn bộ hệ sinh thái Hadoop.
+
+#### So sánh với các paper gốc của Google
+
+| Thành phần Hadoop | Paper gốc của Google      | Mô tả                                                                                                                                          |
+| ----------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **HDFS**          | Google File System (GFS)  | HDFS được xây dựng dựa trên các nguyên lý thiết kế của GFS, cung cấp lưu trữ phân tán chịu lỗi cho dữ liệu dung lượng lớn.                     |
+| **MapReduce**     | Google MapReduce          | Hadoop MapReduce là hiện thực của mô hình MapReduce do Google đề xuất, dùng để xử lý dữ liệu song song ở quy mô lớn.                           |
+| **YARN**          | Google Internal Scheduler | YARN đảm nhiệm quản lý tài nguyên và lập lịch thực thi, tách rời scheduling khỏi mô hình xử lý, tương tự hệ thống scheduler nội bộ của Google. |
+| **Common**        | -                         | Hadoop Common cung cấp các thư viện và tiện ích dùng chung, không được mô tả như một thành phần riêng trong các paper gốc của Google.          |
+
+### Hadoop Distributed File System (HDFS)
+
+HDFS (Hadoop Distributed File System) là một distributed, block-based file system được thiết kế để lưu trữ và xử lý dữ liệu rất lớn trên cụm máy commodity hardware.&#x20;
+
+HDFS lấy cảm hứng từ mô hình filesystem quen thuộc của POSIX (cây thư mục, file, path, permission), nhưng không nhằm mục tiêu tuân thủ đầy đủ POSIX semantics. Thay vào đó, HDFS đánh đổi một số đặc tính như random write, concurrent write và strong consistency theo kiểu local filesystem để đạt được khả năng scale lớn, throughput cao và fault tolerance.&#x20;
+
+{% hint style="info" %}
+## Portable Operating System Interface - POSIX
+
+POSIX (Portable Operating System Interface) là một bộ tiêu chuẩn định nghĩa cách hệ điều hành và filesystem cung cấp giao diện và semantics cho việc làm việc với file, process và tài nguyên hệ thống. POSIX không phải là một implementation cụ thể, mà là tập hợp các quy ước về API, hành vi đọc/ghi, visibility của dữ liệu, atomicity, locking và ordering, nhằm đảm bảo chương trình có thể hoạt động nhất quán trên các hệ thống tương thích Unix. Thông qua các cơ chế như atomic operations và file locking, POSIX cung cấp nền tảng để lập trình viên xây dựng chương trình an toàn và tránh race condition.
+{% endhint %}
+
+Dữ liệu trong HDFS được chia thành các block kích thước lớn và phân tán trên nhiều node, trong khi metadata của filesystem được quản lý tập trung. Thiết kế này khiến HDFS đặc biệt phù hợp với các workload batch, append-only và read-heavy, nhưng không phù hợp cho các bài toán yêu cầu tương tác thời gian thực hoặc POSIX consistency đầy đủ.
+
+#### Block
+
+Như đã mô tả ở trên, HDFS là block storage, nó chia file thành các **block** với kích thước tối đa mặc định là **128 MB**. Một file sẽ được chia thành **ít nhất một block** nếu kích thước nhỏ hơn block size, và thành **n block** nếu kích thước lớn hơn block size.
+
+Các block này được phân phối trên nhiều **DataNode** và được **replicate** (mặc định 3 bản sao) để đảm bảo khả năng chịu lỗi. Từ góc nhìn của client, việc truy cập dữ liệu vẫn thông qua một interface tương tự filesystem truyền thống; client không cần trực tiếp quan tâm đến các block bên dưới. **NameNode** chịu trách nhiệm quản lý metadata của filesystem, bao gồm danh sách block của mỗi file và vị trí các block trên các DataNode, đồng thời expose thông tin này cho client.
+
+HDFS sử dụng **rack-aware block placement policy** để cân bằng giữa hiệu năng và fault tolerance. Ví dụ với replication factor bằng 3, replica đầu tiên thường được đặt trên node đang ghi dữ liệu (nếu có) nhằm giảm network I/O. Replica thứ hai được đặt trên một rack khác để đảm bảo dữ liệu vẫn tồn tại khi xảy ra sự cố ở mức rack. Replica thứ ba được đặt cùng rack với replica thứ hai nhưng trên một node khác, giúp giảm lưu lượng cross-rack trong khi vẫn duy trì khả năng chịu lỗi ở mức rack. Thiết kế này cho phép HDFS vừa tối ưu băng thông mạng, vừa bảo vệ dữ liệu trước các sự cố phần cứng quy mô lớn.
+
+#### Architecture
+
+HDFS được thiết kế theo mô hình **master–worker (master–slave)** với hai thành phần chính là **NameNode** và **DataNode**. Kiến trúc này tách biệt rõ ràng giữa **metadata management** và **data storage**, giúp hệ thống vừa đơn giản, vừa dễ mở rộng.
+
+**NameNode** đóng vai trò master, chịu trách nhiệm quản lý toàn bộ metadata của filesystem. Cụ thể, NameNode duy trì namespace (cây thư mục, file, permission) và ánh xạ từ **file → danh sách block**, cũng như từ **block → danh sách DataNode** đang lưu trữ các replica tương ứng. Metadata này được lưu bền vững trên disk và được cập nhật thông qua các cơ chế log và snapshot.
+
+**DataNode** là các worker node trực tiếp lưu trữ dữ liệu dưới dạng block trên local disk. Mỗi DataNode định kỳ gửi **heartbeat** và **block report** về NameNode để thông báo trạng thái sống/chết cũng như danh sách block mà nó đang nắm giữ. Dựa trên các báo cáo này, NameNode có thể phát hiện failure và kích hoạt cơ chế replication để đảm bảo độ bền dữ liệu.
+
+Bên trong NameNode, **FSNamesystem** là thành phần trung tâm quản lý toàn bộ trạng thái của filesystem trong bộ nhớ. FSNamesystem phối hợp với các module như **BlockManager** và **DatanodeManager** để theo dõi block placement, replication factor và tình trạng của các DataNode. Việc tách logic quản lý metadata khỏi việc lưu trữ dữ liệu thực tế cho phép HDFS mở rộng dung lượng và throughput bằng cách đơn giản là thêm DataNode mới vào cluster.
+
+```mermaid
+---
+config:
+  layout: elk
+  theme: default
+  look: classic
+---
+flowchart LR
+ subgraph NN["NameNode"]
+        FS["FSNamesystem"]
+        BM["BlockManager"]
+        DM["DatanodeManager"]
+  end
+ subgraph DNS["DataNodes"]
+        DN1["DN1"]
+        DN2["DN2"]
+        DN3["DN3"]
+  end
+ subgraph DN1["DataNode"]
+        B1["Block Replica"]
+  end
+ subgraph DN2["DataNode"]
+        B2["Block Replica"]
+  end
+ subgraph DN3["DataNode"]
+        B3["Block Replica"]
+  end
+    Client["Client"] -- Metadata ops (open, create, locate) --> NN
+    Client -- Read / Write blocks --> DN1 & DN2 & DN3
+    FS --> BM & DM
+    DN1 -- Heartbeat & Block report --> NN
+    DN2 -- Heartbeat & Block report --> NN
+    DN3 -- Heartbeat & Block report --> NN
+    NN -- Replication & Placement decisions --> DN1 & DN2 & DN3
+
+    style NN fill:#BBDEFB,stroke:#BBDEFB
+    style DNS fill:transparent,stroke:#757575
+
+```
+
+{% hint style="info" %}
+## Tại một thời điểm HDFS chỉ có 1 active NameNode.
+
+Việc tại mỗi thời điểm chỉ có **một Active NameNode** là một lựa chọn thiết kế có chủ đích nhằm **đảm bảo tính nhất quán (consistency) của metadata** trong HDFS. NameNode quản lý các metadata nhạy cảm như namespace, block mapping và trạng thái replica; các thông tin này liên tục thay đổi theo các thao tác tạo file, ghi dữ liệu, replication và failure recovery.
+
+Nếu cho phép nhiều NameNode đồng thời xử lý metadata operation, hệ thống sẽ phải giải quyết bài toán **distributed consensus** để đồng bộ trạng thái giữa các NameNode, làm tăng đáng kể độ phức tạp và chi phí coordination. Thay vì đi theo hướng này, HDFS chọn mô hình **single metadata authority**, trong đó chỉ một Active NameNode có quyền ghi và cập nhật metadata tại mọi thời điểm, nhằm tránh split-brain và đảm bảo trạng thái filesystem luôn nhất quán.
+
+Mô hình **Active/Standby NameNode** kết hợp với **ZooKeeper** được sử dụng để đảm bảo **high availability**, nhưng không làm thay đổi nguyên tắc cốt lõi trên: tại một thời điểm, chỉ có một Active NameNode chịu trách nhiệm xử lý toàn bộ metadata operation của filesystem.
+
+Do NameNode phải duy trì toàn bộ metadata (file namespace và block mapping) trong bộ nhớ, nên khi số lượng block tăng quá lớn - thường do **small files** hoặc **partition strategy không hợp lý** - NameNode có thể trở thành bottleneck của hệ thống, ảnh hưởng trực tiếp đến khả năng mở rộng và độ ổn định của HDFS.
+{% endhint %}
+
+#### HDFS File Access Flow
+
+**Read Path**
+
+1. **Client mở file và lấy block locations:** Client bắt đầu bằng việc mở file trên HDFS. Ở bước này, client chưa đọc dữ liệu ngay mà chỉ yêu cầu **thông tin metadata** để biết file được chia thành những block nào.
+2. **NameNode trả về metadata của file:** Client gửi yêu cầu tới NameNode để lấy metadata của file. NameNode trả về kích thước file, danh sách các block, với mỗi block là vị trí các DataNode đang lưu replica. NameNode **chỉ trả về metadata**, không tham gia vào việc truyền dữ liệu.
+3. **Client đọc dữ liệu trực tiếp từ DataNode:** Sau khi có block locations, client **kết nối trực tiếp tới DataNode** tương ứng để đọc dữ liệu. Client xác định block cần đọc dựa trên offset hiện tại trong file và chọn một DataNode phù hợp.
+4. **DataNode phục vụ yêu cầu đọc:** DataNode nhận yêu cầu đọc block và gửi dữ liệu về cho client theo từng gói (packet). Mỗi gói dữ liệu đi kèm checksum để client có thể kiểm tra tính toàn vẹn trong quá trình đọc. Về cơ chế đọc file phía client, Hadoop implement các class (ví dụ `DFSInputStream`) với các interface tương tự Local File System.
+5. **Chuyển block hoặc replica khi cần:** Khi client đọc hết một block, hoặc nếu DataNode đang đọc gặp lỗi, client có thể **chuyển sang block tiếp theo hoặc replica khác** của cùng block mà không cần NameNode can thiệp thêm, trừ khi cần lấy lại metadata mới.
+
+```mermaid
+sequenceDiagram
+    participant Client as HDFS Client
+    participant DFS as DistributedFileSystem
+    participant DFSClient as DFSClient
+    participant NN as NameNode
+    participant DN as DataNode
+    
+    Client->>DFS: 1. open(...)
+    DFS->>DFSClient: 2. getBlockLocations(...)
+    DFSClient->>NN: 3. [RPC] getLocatedBlocks(...)
+    NN-->>DFSClient: 4. LocatedBlocks (danh sách block + locations)
+    DFSClient-->>DFS: 5. BlockLocation[]
+    DFS-->>Client: 6. FSDataInputStream (DFSInputStream)
+    
+    Client->>DFS: 7. read(buffer)
+    DFS->>DFSInputStream: 8. read(buffer)
+    DFSInputStream->>DFSInputStream: 9. blockSeekTo(pos)
+    DFSInputStream->>DFSClient: 10. getBlockAt(offset)
+    DFSClient->>NN: 11. getLocatedBlocks(src, offset) (nếu cần)
+    NN-->>DFSClient: 12. LocatedBlock
+    DFSClient-->>DFSInputStream: 13. LocatedBlock với DataNode info
+    
+    DFSInputStream->>DN: 14. readBlock(block, offset, length)
+    DN-->>DFSInputStream: 15. Data packets + checksum
+    DFSInputStream-->>DFS: 16. bytes read
+    DFS-->>Client: 17. bytes read
+```
+
+**Write Path**
+
+1. **Client yêu cầu cấp phát block từ NameNode:** Khi ghi dữ liệu mới, client trước hết gửi yêu cầu tới NameNode để xin **cấp phát block** và nhận về danh sách các DataNode sẽ tham gia lưu trữ block đó (theo replication policy).
+2. **Khởi tạo pipeline ghi dữ liệu:** Dựa trên danh sách DataNode được trả về, client thiết lập một **pipeline ghi dữ liệu**, trong đó dữ liệu sẽ được truyền tuần tự qua các DataNode theo thứ tự xác định.
+3. **Thiết lập kết nối giữa các DataNode:** Client kết nối tới DataNode đầu tiên trong pipeline. DataNode này tiếp tục thiết lập kết nối tới DataNode kế tiếp, tạo thành một chuỗi truyền dữ liệu liên tục giữa các node lưu trữ.
+4. **Ghi dữ liệu theo dạng streaming:** Client chia dữ liệu thành các gói nhỏ và gửi vào pipeline. Dữ liệu được truyền từ DataNode đầu tiên sang các DataNode phía sau, đồng thời mỗi DataNode ghi dữ liệu xuống local disk của mình.
+5. **Acknowledgment response pipeline:** Sau khi một gói dữ liệu được ghi thành công, tín hiệu xác nhận (acknowledgment) được gửi ngược chiều pipeline, từ DataNode cuối cùng về client. Client chỉ coi dữ liệu đã ghi thành công khi nhận đủ acknowledgment từ tất cả các replica.
+6. &#x20;**Xử lý lỗi và phục hồi pipeline:** Nếu một DataNode trong pipeline gặp lỗi trong quá trình ghi, client sẽ tái thiết lập pipeline mới với các DataNode còn khả dụng, và tiếp tục quá trình ghi mà không cần hủy toàn bộ thao tác ghi trước đó.
+
+```mermaid
+sequenceDiagram
+    participant Client as HDFS Client
+    participant NN as NameNode
+    participant DN1 as DataNode 1
+    participant DN2 as DataNode 2
+    participant DN3 as DataNode 3
+    participant DS as DataStreamer"
+    
+    Client->>NN: 1. addBlock() - yêu cầu cấp block mới
+    NN-->>Client: 2. LocatedBlock (danh sách DataNodes)
+    
+    Client->>DS: 3. Khởi tạo DataStreamer
+    DS->>DN1: 4. writeBlock() - thiết lập pipeline
+    DN1->>DN2: 5. writeBlock() - forward request
+    DN2->>DN3: 6. writeBlock() - forward request
+    DN3-->>DN2: 7. ACK (connect success)
+    DN2-->>DN1: 8. ACK (connect success)
+    DN1-->>DS: 9. ACK (pipeline ready)
+    
+    loop Ghi data
+        Client->>DS: 10. write(data)
+        DS->>DN1: 11. sendPacket(data)
+        DN1->>DN2: 12. forwardPacket(data)
+        DN2->>DN3: 13. forwardPacket(data)
+        DN3-->>DN2: 14. ACK(packet)
+        DN2-->>DN1: 15. ACK(packet)
+        DN1-->>DS: 16. ACK(packet)
+        DS-->>Client: 17. write complete
+    end
+```
+
+### Yet Another Resource Negotiator (YARN)
+
+Researching...
+
+### Hadoop MapReduce Implementation details
+
+Researching...
+
+### My Summary
 
 Khi đọc paper này, cảm giác rõ nhất của tớ là mọi thứ đều xoay quanh một chữ: **đơn giản**. Tác giả cố tình bó hẹp mô hình tính toán vào Map và Reduce để phần hệ thống phía dưới có thể xử lý các vấn đề phức tạp như phân tán, retry hay machine failure. Nhìn ở góc độ thiết kế, điều này khá hợp lý, nhưng khi đọc với tâm thế của một engineer muốn hiểu “nó chạy thật sự như thế nào”, tớ lại thấy hơi hụt.
 
-Paper có nói MapReduce là một mô hình linh hoạt, nhưng với tớ thì mức độ linh hoạt này vẫn khá hạn chế. Nhiều quyết định thiết kế dường như được đưa ra chỉ để giữ cho implementation đơn giản, kể cả khi điều đó đồng nghĩa với việc đẩy các chi tiết phức tạp hơn (failure nuance, execution detail, edge case) ra ngoài abstraction. Điều này làm tớ có cảm giác là paper đang “né” khá nhiều câu hỏi mà một người đọc quan tâm đến runtime và mechanics tự nhiên sẽ đặt ra.
+Paper có nói MapReduce là một mô hình linh hoạt, tớ công nhận điều đó nhưng dù sao thì theo góc nhìn cá nhân thì nó vẫn đang chỉ mô hình hoá được một số lượng bài toán (không rõ nếu tớ thực sự sử dụng framework thì tớ còn có định kiến này hay không, nhưng giờ cũng khá khó có cơ hội để làm điều đó). Nhiều quyết định thiết kế dường như được đưa ra chỉ để giữ cho implementation đơn giản, kể cả khi điều đó đồng nghĩa với việc đẩy các chi tiết phức tạp hơn (failure nuance, execution detail, edge case) ra ngoài abstraction. Điều này làm tớ có cảm giác là paper đang “né” khá nhiều câu hỏi mà một người đọc quan tâm đến runtime và mechanics tự nhiên sẽ đặt ra.
 
 Ngoài ra, cách trình bày của paper thiên nhiều về abstraction và ý tưởng tổng quát hơn là mô tả cụ thể quá trình thực thi. Có lẽ paper được viết cho những người cần nắm tư duy thiết kế hơn là những người muốn lần theo từng bước execution. Vì vậy, khi đọc với mindset muốn hiểu sâu execution detail, cảm giác thiếu rõ ràng và hơi khó chịu là điều khó tránh khỏi.
 
