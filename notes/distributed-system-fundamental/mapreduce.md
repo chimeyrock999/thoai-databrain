@@ -315,7 +315,7 @@ Tuy nhiên, kích thước của `M` và `R` bị giới hạn thực tế bởi
 
 ### Backup Tasks
 
-Một nguyên nhân phổ biến làm kéo dài thời gian hoàn thành MapReduce job là sự xuất hiện của các “straggler” — những worker xử lý chậm bất thường ở giai đoạn cuối. Các straggler có thể xuất phát từ lỗi phần cứng, contention tài nguyên, hoặc lỗi cấu hình hệ thống.
+Một nguyên nhân phổ biến làm kéo dài thời gian hoàn thành MapReduce job là sự xuất hiện của các “straggler” - những worker xử lý chậm bất thường ở giai đoạn cuối. Các straggler có thể xuất phát từ lỗi phần cứng, contention tài nguyên, hoặc lỗi cấu hình hệ thống.
 
 Để giảm tác động này, khi job gần hoàn tất, master sẽ khởi chạy các bản sao dự phòng (backup execution) cho những task vẫn đang chạy. Một task được coi là hoàn thành khi bất kỳ execution nào (primary hoặc backup) kết thúc trước. Cơ chế này chỉ làm tăng mức sử dụng tài nguyên thêm một vài phần trăm nhưng giúp giảm đáng kể tail latency của job. Thực nghiệm cho thấy việc tắt backup task có thể làm thời gian chạy tăng lên đáng kể đối với các job lớn.
 
@@ -439,6 +439,92 @@ flowchart LR
 3. **MapReduce** là mô hình lập trình xử lý dữ liệu song song, được triển khai như một framework chạy trên **YARN** thông qua các container.
 4. **Hadoop Common** cung cấp các thư viện và tiện ích dùng chung cho toàn bộ hệ sinh thái Hadoop.
 
+Hadoop được design để đồng thời giải quyết cả 2 bài toán **lưu trữ dữ liệu lớn (HDFS)** và **xử lý phân tán (YARN + MapReduce)**. Trong kiến trúc này, compute và storage **không tách rời hoàn toàn**, mà thường **overlap trên cùng một node.** Ví dụ một máy vừa có thể chạy DataNode (lưu trữ block dữ liệu) vừa chạy NodeManager (quản lý tài nguyên tính toán).&#x20;
+
+Trong đó, **HDFS** chịu trách nhiệm về lưu trữ dữ liệu, **YARN** đảm nhiệm quản lý và phân phối tài nguyên tính toán, còn **MapReduce** là framework chạy trên YARN, cung cấp mô hình lập trình để user thực hiện các tác vụ xử lý dữ liệu trên cluster.
+
+```mermaid
+flowchart TB
+    %% =========================
+    %% Client Layer
+    %% =========================
+    subgraph CLIENT["Client Layer"]
+        Client["Client<br/>(hadoop jar, spark-submit, etc.)"]
+    end
+
+    %% =========================
+    %% Hadoop Logical Components
+    %% =========================
+    subgraph LOGICAL["Hadoop Logical Components"]
+        Common["Hadoop Common"]
+        HDFS["HDFS"]
+        YARN["YARN"]
+        MR["MapReduce"]
+    end
+
+    %% =========================
+    %% YARN Internals
+    %% =========================
+    subgraph YARN_INT["YARN Internals"]
+        RM["ResourceManager"]
+        AM["ApplicationMaster"]
+        NM1["NodeManager"]
+        NM2["NodeManager"]
+        NM3["NodeManager"]
+    end
+
+    %% =========================
+    %% HDFS Internals
+    %% =========================
+    subgraph HDFS_INT["HDFS Internals"]
+        NN["NameNode"]
+        DN1["DataNode"]
+        DN2["DataNode"]
+        DN3["DataNode"]
+    end
+
+    %% =========================
+    %% Relationships (Logical)
+    %% =========================
+    Common --> HDFS
+    Common --> YARN
+    Common --> MR
+
+    MR --> YARN
+    YARN --> RM & AM & NM1 & NM2 & NM3
+    HDFS --> NN & DN1 & DN2 & DN3
+
+    %% =========================
+    %% Runtime Flow
+    %% =========================
+    Client -->|Submit Job| YARN
+    Client -->|Read Metadata| NN
+
+    RM -->|Launch| AM
+    AM -->|Request Containers| RM
+    AM -->|Run Tasks| NM1 & NM2 & NM3
+
+    NM1 -->|Read/Write Blocks| DN1
+    NM2 -->|Read/Write Blocks| DN2
+    NM3 -->|Read/Write Blocks| DN3
+
+    %% =========================
+    %% Styling
+    %% =========================
+    style LOGICAL fill:#C8E6C9
+    style YARN_INT fill:#BBDEFB
+    style HDFS_INT fill:#FFF9C4
+    style CLIENT fill:#E1BEE7
+```
+
+{% hint style="info" %}
+## Tách riêng compute và storage trong kiến trúc hiện đại.
+
+Ngày nay, nhờ sự phát triển của phần cứng, mạng và hạ tầng cloud, compute và storage thường được **tách rời** thay vì gắn chặt như trong các hệ thống đời đầu. Thay vì một cluster vừa lưu trữ vừa xử lý, các hệ thống hiện đại có xu hướng chuyên biệt hóa vai trò: **object storage** như S3, GCS, ADLS đảm nhiệm lưu trữ dữ liệu, trong khi các **engine compute** như Spark, Flink hay các workload chạy trên Kubernetes đảm nhiệm xử lý.
+
+Cách tiếp cận này cho phép scale compute và storage độc lập, tăng tính linh hoạt và tối ưu chi phí vận hành. Trong bối cảnh đó, Hadoop không còn giữ vai trò trung tâm như trước, nhưng các thành phần của nó - đặc biệt là **HDFS** - vẫn được sử dụng riêng trong những môi trường on-premise.
+{% endhint %}
+
 #### So sánh với các paper gốc của Google
 
 | Thành phần Hadoop | Paper gốc của Google      | Mô tả                                                                                                                                          |
@@ -452,7 +538,7 @@ flowchart LR
 
 HDFS (Hadoop Distributed File System) là một distributed, block-based file system được thiết kế để lưu trữ và xử lý dữ liệu rất lớn trên cụm máy commodity hardware.&#x20;
 
-HDFS lấy cảm hứng từ mô hình filesystem quen thuộc của POSIX (cây thư mục, file, path, permission), nhưng không nhằm mục tiêu tuân thủ đầy đủ POSIX semantics. Thay vào đó, HDFS đánh đổi một số đặc tính như random write, concurrent write và strong consistency theo kiểu local filesystem để đạt được khả năng scale lớn, throughput cao và fault tolerance.&#x20;
+HDFS lấy cảm hứng từ mô hình filesystem quen thuộc của POSIX (cây thư mục, file, path, permission), nhưng không nhằm mục tiêu tuân thủ đầy đủ POSIX semantics. Thay vào đó, HDFS đánh đổi một số đặc tính như [random write](#user-content-fn-1)[^1], [concurrent write](#user-content-fn-2)[^2] và [strong consistency](#user-content-fn-3)[^3] theo kiểu local filesystem để đạt được khả năng scale lớn, throughput cao và fault tolerance.&#x20;
 
 {% hint style="info" %}
 ## Portable Operating System Interface - POSIX
@@ -469,6 +555,20 @@ Như đã mô tả ở trên, HDFS là block storage, nó chia file thành các 
 Các block này được phân phối trên nhiều **DataNode** và được **replicate** (mặc định 3 bản sao) để đảm bảo khả năng chịu lỗi. Từ góc nhìn của client, việc truy cập dữ liệu vẫn thông qua một interface tương tự filesystem truyền thống; client không cần trực tiếp quan tâm đến các block bên dưới. **NameNode** chịu trách nhiệm quản lý metadata của filesystem, bao gồm danh sách block của mỗi file và vị trí các block trên các DataNode, đồng thời expose thông tin này cho client.
 
 HDFS sử dụng **rack-aware block placement policy** để cân bằng giữa hiệu năng và fault tolerance. Ví dụ với replication factor bằng 3, replica đầu tiên thường được đặt trên node đang ghi dữ liệu (nếu có) nhằm giảm network I/O. Replica thứ hai được đặt trên một rack khác để đảm bảo dữ liệu vẫn tồn tại khi xảy ra sự cố ở mức rack. Replica thứ ba được đặt cùng rack với replica thứ hai nhưng trên một node khác, giúp giảm lưu lượng cross-rack trong khi vẫn duy trì khả năng chịu lỗi ở mức rack. Thiết kế này cho phép HDFS vừa tối ưu băng thông mạng, vừa bảo vệ dữ liệu trước các sự cố phần cứng quy mô lớn.
+
+Một điểm quan trọng là **HDFS không quan tâm đến file type hay cấu trúc logic của dữ liệu**. Ở tầng lưu trữ, HDFS chỉ xem file như một dãy byte và chia chúng thành các block kích thước cố định, kể cả khi việc chia này cắt ngang một record hay một đơn vị thông tin logic (ví dụ như một dòng trong file text).
+
+Việc **ghép các block lại thành luồng nội dung file liên tục** được thực hiện ở phía client. Client sử dụng metadata từ NameNode để xác định thứ tự các block và đọc dữ liệu từ các DataNode tương ứng, sau đó stream chúng lại thành nội dung file hoàn chỉnh. Do đó, các concern liên quan đến record boundary hay định dạng dữ liệu không thuộc trách nhiệm của HDFS, mà được xử lý ở tầng compute (ví dụ như InputFormat và RecordReader trong MapReduce).
+
+{% hint style="info" %}
+## Replication cost trade-off
+
+HDFS đảm bảo fault tolerance bằng cách **replicate toàn bộ block dữ liệu**, với replication factor mặc định là 3. Điều này đồng nghĩa với việc mỗi file dữ liệu sẽ tiêu tốn khoảng **3× dung lượng lưu trữ thực tế**. Cách tiếp cận này đơn giản, dễ triển khai và phù hợp với môi trường on-premise, nơi chi phí lưu trữ và băng thông được kiểm soát trực tiếp.
+
+Ngược lại, các **object storage** ra đời sau như **S3** không đi theo cách replicate nguyên khối dữ liệu với hệ số cố định như HDFS (thường là 3×). Thay vào đó, chúng sử dụng những cơ chế lưu trữ và phân tán dữ liệu tinh vi hơn để đạt được độ bền và khả năng chịu lỗi tương đương, trong khi chi phí lưu trữ hiệu quả hơn, với overhead thường chỉ khoảng **1.3–1.5×** so với dung lượng dữ liệu gốc.
+
+Sự khác biệt này phản ánh rõ bối cảnh và triết lý thiết kế: HDFS ưu tiên sự đơn giản và throughput cho batch processing trên hạ tầng tự quản lý, còn các object storage hiện đại ưu tiên tối ưu chi phí và độ bền dữ liệu ở quy mô rất lớn trong môi trường cloud.
+{% endhint %}
 
 #### Architecture
 
@@ -580,6 +680,14 @@ sequenceDiagram
 5. **Acknowledgment response pipeline:** Sau khi một gói dữ liệu được ghi thành công, tín hiệu xác nhận (acknowledgment) được gửi ngược chiều pipeline, từ DataNode cuối cùng về client. Client chỉ coi dữ liệu đã ghi thành công khi nhận đủ acknowledgment từ tất cả các replica.
 6. &#x20;**Xử lý lỗi và phục hồi pipeline:** Nếu một DataNode trong pipeline gặp lỗi trong quá trình ghi, client sẽ tái thiết lập pipeline mới với các DataNode còn khả dụng, và tiếp tục quá trình ghi mà không cần hủy toàn bộ thao tác ghi trước đó.
 
+Mặc dù mục tiêu đảm bảo atomicity khi tạo file trong HDFS tương đồng với mô hình được mô tả sơ bộ trong paper, cơ chế thực hiện có sự khác biệt quan trọng.
+
+Trong paper, atomicity thường được giải thích thông qua thao tác rename file, trong đó file chỉ trở nên visible sau khi dữ liệu đã được ghi hoàn chỉnh và rename thành công.
+
+Ngược lại, trong HDFS, tính atomic không dựa vào rename dữ liệu trên DataNode, mà nằm ở việc commit metadata tại NameNode. Trong suốt quá trình ghi, dữ liệu có thể đã tồn tại vật lý trên các DataNode, nhưng file chỉ được coi là tồn tại trong filesystem khi client gọi `close()` và DataNode tiến hành move các block về đúng directory, NameNode cập nhật namespace tương ứng.
+
+Cách tiếp cận này giúp HDFS đạt được atomic file creation bằng cách tập trung kiểm soát trạng thái tại metadata layer, đồng thời tránh phải hỗ trợ các filesystem semantics phức tạp như random write hay in-place update, qua đó tối ưu cho workload ghi tuần tự và throughput cao.
+
 ```mermaid
 sequenceDiagram
     participant Client as HDFS Client
@@ -614,11 +722,60 @@ sequenceDiagram
 
 ### Yet Another Resource Negotiator (YARN)
 
-Researching...
+#### YARN Introduction
 
-### Hadoop MapReduce Implementation details
+Trong paper MapReduce, tác giả có đề cập đến việc user submit application của họ thông qua một scheduling system. Scheduler này không được mô tả chi tiết, chỉ được nhắc đến như một thành phần nằm bên ngoài MapReduce runtime.&#x20;
 
-Researching...
+Trong Hadoop, YARN chính là hệ thống scheduler và resource manager mà paper đã lướt qua. **YARN** đóng vai trò là một **compute cluster và workload/resource manager** chạy trên nền Hadoop cluster. YARN chịu trách nhiệm quản lý tài nguyên (CPU, memory) của toàn cluster và phân phối các tài nguyên này cho các application khác nhau thông qua cơ chế container. Nhưng YARN không chỉ dành cho MapReduce mà nó còn có thể được sử dụng mới những thành phần khác trong Hadoop ecosystem như Spark, Flink, Strorm, Tez, etc.
+
+Từ paper [Apache Hadoop YARN: Yet Another Resource Negotiator](https://www.cse.ust.hk/~weiwa/teaching/Fall15-COMP6611B/reading_list/YARN.pdf), người ta giới thiệu YARN ra đời nhằm khắc phục hạn chế của **MapReduce 1.0**, nơi việc quản lý tài nguyên và lập lịch bị gắn chặt vào MapReduce framework. Trong mô hình cũ, mỗi job MapReduce chiếm toàn bộ cluster trong suốt vòng đời của nó, khiến việc **chia sẻ tài nguyên giữa nhiều application** trở nên kém hiệu quả và khó mở rộng. Bằng cách tách resource management ra khỏi MapReduce, YARN cho phép nhiều MapReduce job - cũng như các framework khác - **chạy đồng thời và chia sẻ tài nguyên chung trên cùng một cluster**.
+
+<details>
+
+<summary><a href="mapreduce.md#to-co-kha-kha-cau-hoi-o-cho-nay">[4].</a> "Worker có được cố định vai trò (map-only / reduce-only) hay có thể chạy cả map và reduce task ở các thời điểm khác nhau?"</summary>
+
+Việc worker có bị cố định vai trò (map-only hay reduce-only) **không thuộc về abstraction của MapReduce**, mà phụ thuộc vào **implementation cụ thể**. Trong MapReduce paper gốc của Google, tác giả không định nghĩa worker theo vai trò cố định. Paper chỉ mô tả rằng có map tasks và reduce tasks, và master sẽ gán các task này cho những worker đang rảnh. Không có khái niệm slot hay role cố định trên worker, nên từ paper **không thể suy ra** rằng worker bị ràng buộc chỉ chạy map hoặc reduce. Abstraction được cố tình giữ ở mức cao và để ngỏ cho các cách triển khai khác nhau.
+
+Trong Hadoop MapReduce 1.x (trước YARN), việc cố định vai trò xuất hiện như một **chi tiết implementation**. Worker (TaskTracker) được cấu hình với số lượng map slots và reduce slots riêng biệt, mỗi slot chỉ chạy được một loại task và không thể dùng lại cho loại khác. Điều này dẫn đến hệ quả là khi workload lệch pha (ví dụ hết map task nhưng còn reduce slot), tài nguyên bị idle và utilization kém. Lưu ý rằng role không bị cố định theo node, nhưng lại **bị cố định theo slot**.
+
+Từ Hadoop 2.x trở đi với YARN, mô hình này được thay thế hoàn toàn. Không còn khái niệm map slot hay reduce slot; NodeManager chỉ cung cấp tài nguyên tổng quát (CPU, memory), và task chạy trong các container không gắn role cố định. Một container có thể chạy map task, reduce task hoặc thậm chí các workload khác như Spark hay Flink. Việc task là map hay reduce được quyết định bởi ApplicationMaster của MapReduce, chứ không phải bởi worker hay container. Nhờ đó, tài nguyên được tái sử dụng linh hoạt theo thời điểm, và worker không còn bị ràng buộc vai trò cố định.
+
+</details>
+
+#### YARN Components
+
+YARN sử dụng kiến trúc master–worker, gồm bốn thành phần chính, mỗi thành phần đảm nhiệm một vai trò rõ ràng trong việc quản lý và phân phối tài nguyên cho cluster.
+
+<figure><img src="../.gitbook/assets/YARN_Architecture.png" alt=""><figcaption></figcaption></figure>
+
+* **ResourceManager (RM)** là daemon master chạy trên một node trung tâm, chịu trách nhiệm quản lý tài nguyên toàn cluster. RM quyết định _ai được dùng bao nhiêu tài nguyên_, nhưng không trực tiếp chạy task. RM bao gồm:
+  * **Scheduler**: phân bổ tài nguyên cho các application dựa trên các policy như FIFO, Capacity hoặc Fair Scheduler.
+  * **ApplicationsManager**: tiếp nhận application submission, khởi động ApplicationMaster đầu tiên và xử lý việc restart AM khi xảy ra lỗi.
+* **NodeManager (NM)** là daemon worker chạy trên mỗi node trong cluster. NM chịu trách nhiệm quản lý tài nguyên cục bộ của node đó, bao gồm việc:
+  * khởi chạy và theo dõi vòng đời của container,
+  * giám sát việc sử dụng CPU, memory, disk,
+  * gửi heartbeat định kỳ về ResourceManager để báo cáo trạng thái.
+* **ApplicationMaster (AM)** là tiến trình đại diện cho _một application cụ thể_. AM được khởi động trong một container do RM cấp phát, và tồn tại trong suốt vòng đời của application. AM chịu trách nhiệm:
+  * đàm phán tài nguyên với RM,
+  * yêu cầu NM khởi chạy các container,
+  * quản lý luồng thực thi, xử lý lỗi và tối ưu cho application của mình. Mỗi application có một ApplicationMaster riêng.
+* **Container** là đơn vị phân bổ tài nguyên cơ bản trong YARN. Một container đại diện cho một gói tài nguyên (CPU, memory, v.v.) trên một node cụ thể, và được dùng để chạy một tiến trình ứng dụng. Container không gắn với vai trò cố định (map, reduce hay framework nào), mà chỉ là lớp trừu tượng để YARN áp đặt giới hạn tài nguyên khi thực thi workload.
+
+#### Application lifecycle
+
+<i class="fa-wand-sparkles">:wand-sparkles:</i>
+
+#### Scheduling model
+
+<i class="fa-watch">:watch:</i>
+
+#### Failure model
+
+<i class="fa-typewriter">:typewriter:</i>
+
+### Hadoop MapReduce Implementation
+
+<i class="fa-timer">:timer:</i>
 
 ### My Summary
 
@@ -632,4 +789,12 @@ Ngoài ra, cách trình bày của paper thiên nhiều về abstraction và ý 
 
 1. [MapReduce: Simplified Data Processing on Large Clusters](https://research.google.com/archive/mapreduce-osdi04.pdf)
 2. [Hadoop MapReduce](https://hadoop.apache.org/docs/r1.2.1/mapred_tutorial.html)
-3. [Templates in C++](https://www.geeksforgeeks.org/cpp/templates-cpp/)
+3. [Hadoop Code Repository](https://github.com/apache/hadoop)
+4. [The Hadoop Distributed File System](https://pages.cs.wisc.edu/~akella/CS838/F15/838-CloudPapers/hdfs.pdf)
+5. [Apache Hadoop YARN: Yet Another Resource Negotiator](https://www.cse.ust.hk/~weiwa/teaching/Fall15-COMP6611B/reading_list/YARN.pdf)
+
+[^1]: Ghi dữ liệu vào **bất kỳ offset nào trong file** (ví dụ sửa byte ở giữa file). Local FS hỗ trợ, nhưng HDFS **không hỗ trợ** vì sẽ phá vỡ mô hình ghi tuần tự theo block và làm phức tạp replication.
+
+[^2]: **Nhiều client cùng lúc ghi vào cùng một file**.  Trong filesystem truyền thống cần locking/coordination rất phức tạp. HDFS **chủ động cấm** để tránh race condition và metadata inconsistency.
+
+[^3]: Mọi client **luôn thấy ngay trạng thái mới nhất** của file sau mỗi thao tác ghi. Đòi hỏi coordination chặt chẽ giữa các node. HDFS **không đảm bảo kiểu này**, thay vào đó dùng mô hình: _file chỉ “visible & consistent” sau khi ghi xong và close()_.

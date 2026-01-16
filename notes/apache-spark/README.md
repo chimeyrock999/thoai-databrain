@@ -26,7 +26,60 @@ Apache Spark là unified computing engine và tập hợp các thư viện cho v
 
 Spark là một framework điều phối hoạt động của một nhóm machines (quản lý và điều phối quá trình thực thi các tasks trong toàn bộ cluster). Lưu lý rằng Spark chỉ quản lý task trên cluster, không quản lý cluster, nhiệm vụ này được tổ chức bởi Cluster Manager.
 
-<figure><img src="../.gitbook/assets/spark_architecture.png" alt=""><figcaption><p>Apache Spark components and architecture</p></figcaption></figure>
+```mermaid
+flowchart TB
+ subgraph SparkApp["Spark Application"]
+        SparkDriver["SparkDriver"]
+  end
+ subgraph SparkDriver["Spark Driver"]
+        SparkSession["Spark Session"]
+  end
+ subgraph ExecutorCore1[" "]
+        Core1["Core1"]
+        Core2["Core2"]
+        Core3["Core3"]
+        Core4["Core4"]
+  end
+ subgraph SparkExecutor1["Spark Executor"]
+        ExecutorCore1
+  end
+ subgraph ExecutorCore2[" "]
+        Core5["Core5"]
+        Core6["Core6"]
+        Core7["Core7"]
+        Core8["Core8"]
+  end
+ subgraph SparkExecutor2["Spark Executor"]
+        ExecutorCore2
+  end
+    SparkApp <--> SparkExecutor1 & SparkExecutor2 & ClusterManager["Cluster Manager"]
+    ClusterManager <--> SparkExecutor1 & SparkExecutor2
+    Core4 -.- core_desc["Core"]
+    Core5 -.- core_desc
+
+    Core1@{ shape: sm-circ}
+    Core2@{ shape: sm-circ}
+    Core3@{ shape: sm-circ}
+    Core4@{ shape: sm-circ}
+    Core5@{ shape: sm-circ}
+    Core6@{ shape: sm-circ}
+    Core7@{ shape: sm-circ}
+    Core8@{ shape: sm-circ}
+    ClusterManager@{ shape: rounded}
+    core_desc@{ shape: text}
+     ExecutorCore1:::Executor
+     ExecutorCore2:::Executor
+    classDef Executor fill:#BBDEFB
+    style SparkDriver fill:#C8E6C9,stroke:#757575
+    style SparkSession fill:#BBDEFB
+    style ExecutorCore1 stroke:#757575
+    style ExecutorCore2 stroke:#757575
+    style SparkApp fill:#FFFFFF,stroke:#757575
+    style SparkExecutor1 fill:#FFFFFF,stroke:#757575
+    style SparkExecutor2 fill:#FFFFFF,stroke:#757575
+  
+
+```
 
 ### **Spark Application**
 
